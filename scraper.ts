@@ -16,11 +16,10 @@ import * as fs from "fs";
 
 sqlite3.verbose();
 
-const DevelopmentApplicationsUrl = "https://www.alexandrina.sa.gov.au/page.aspx?u=2351";
+const DevelopmentApplicationsUrl = "http://www.alexandrina.sa.gov.au/page.aspx?u=2351";
 const CommentUrl = "mailto:alex@alexandrina.sa.gov.au";
 
 declare const global: any;
-declare const process: any;
 
 // All valid suburb names.
 
@@ -137,7 +136,7 @@ async function parsePdf(url: string) {
 
     // Read the PDF.
 
-    let buffer = await request({ url: url, encoding: null, proxy: process.env.MORPH_PROXY });
+    let buffer = await request({ url: url, encoding: null });
     await sleep(2000 + getRandom(0, 5) * 1000);
 
     // Parse the PDF.  Each page has details of a single application.
@@ -245,7 +244,7 @@ async function main() {
 
     console.log(`Retrieving page: ${DevelopmentApplicationsUrl}`);
 
-    let body = await request({ url: DevelopmentApplicationsUrl, proxy: process.env.MORPH_PROXY });
+    let body = await request({ url: DevelopmentApplicationsUrl });
     let $ = cheerio.load(body);
     await sleep(2000 + getRandom(0, 5) * 1000);
 
