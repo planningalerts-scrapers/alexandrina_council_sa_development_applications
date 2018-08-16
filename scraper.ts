@@ -12,6 +12,7 @@ import * as sqlite3 from "sqlite3";
 import * as urlparser from "url";
 import * as moment from "moment";
 import * as pdfjs from "pdfjs-dist";
+import * as fs from "fs";
 
 sqlite3.verbose();
 
@@ -19,6 +20,10 @@ const DevelopmentApplicationsUrl = "https://www.alexandrina.sa.gov.au/page.aspx?
 const CommentUrl = "mailto:alex@alexandrina.sa.gov.au";
 
 declare const global: any;
+
+// All valid suburb names.
+
+let SuburbNames = null;
 
 // Sets up an sqlite database.
 
@@ -113,7 +118,7 @@ function isOverlap(element1: Element, element2: Element, direction: Direction) {
 
 function findClosestElement(elements: Element[], text: string, direction: Direction) {
     text = text.toLowerCase();
-    let matchingElement = elements.find(element => element.text.toLowerCase().startsWith(text));
+    let matchingElement = elements.find(element => element.text.trim().toLowerCase().startsWith(text));
     if (matchingElement === undefined)
         return undefined;
 
@@ -131,11 +136,9 @@ async function parsePdf(url: string) {
 
     // Read the PDF.
 
-    let buffer = await request({ url: url, encoding: null, proxy: process.env.MORPH_PROXY });
-    await sleep(2000 + getRandom(0, 5) * 1000);
+    let buffer = await request({ url: url, encoding: null });
 
-    // Parse the PDF.  Each page has details of a single application (which in some cases may
-    // overflow onto subsequent pages).
+    // Parse the PDF.  Each page has details of a single application.
 
     const pdf = await pdfjs.getDocument({ data: buffer });
 
@@ -154,34 +157,58 @@ async function parsePdf(url: string) {
         // Find the application number, reason, received date and address in the elements (based
         // on proximity to known text such as "Dev App No").
 
-        let applicationNumberElement = findClosestElement(elements, "Dev App No", Direction.Right);
-        let reasonElement = applicationNumberElement ? findClosestElement(elements, applicationNumberElement.text, Direction.Right) : undefined;
-        let receivedDateElement = findClosestElement(elements, "Application Rec'd Council", Direction.Right);
-        let addressElement = findClosestElement(elements, "Property Detail", Direction.Down);
+        let applicationNumberElement = findClosestElement(elements, "Application No", Direction.Right);
+        let reasonElement = findClosestElement(elements, "Development Description", Direction.Down);
+        let receivedDateElement = findClosestElement(elements, "Application received", Direction.Right);
+        let houseNumberElement = findClosestElement(elements, "Property House No", Direction.Right);
+        let streetElement = findClosestElement(elements, "Property Street", Direction.Right);
+        let suburbElement = findClosestElement(elements, "Property Suburb", Direction.Right);
+
+        let address = "";
+        if (houseNumberElement !== undefined)
+            address += houseNumberElement.text.trim();
+        if (streetElement !== undefined)
+            address += ((address === "") ? "" : " ") + streetElement.text.trim();
+        if (suburbElement === undefined || suburbElement.text.trim() === "") {
+            console.log("Ignoring application because there is no suburb.");
+            continue;
+        }
+
+        // Attempt to add the state and post code to the suburb.
+
+        let suburbName = SuburbNames[suburbElement.text.trim()];
+        if (suburbName === undefined)
+            suburbName = suburbElement.text.trim();
+
+        address += ((address === "") ? "" : ", ") + suburbName;
+        address = address.trim();
 
         // Ensure that the development application details are valid.
 
-        if (applicationNumberElement !== undefined && applicationNumberElement.text.trim() !== "" && addressElement !== undefined && addressElement.text.trim() !== "") {
-            let receivedDate = moment.invalid();
-            if (receivedDateElement !== undefined)
-                receivedDate = moment(receivedDateElement.text.trim(), "D/MM/YYYY", true);  // allows the leading zero of the day to be omitted
-
-            let reason = "No description provided";
-            if (reasonElement !== null && reasonElement.text.trim() !== "")
-                reason = reasonElement.text.trim();
-
-            let developmentApplication = {
-                applicationNumber: applicationNumberElement.text.trim().replace(/\s/g, ""),
-                address: addressElement.text.trim(),
-                reason: reason,
-                informationUrl: url,
-                commentUrl: CommentUrl,
-                scrapeDate: moment().format("YYYY-MM-DD"),
-                receivedDate: receivedDate.isValid() ? receivedDate.format("YYYY-MM-DD") : ""
-            }
-
-            developmentApplications.push(developmentApplication);
+        if (applicationNumberElement === undefined || applicationNumberElement.text.trim() === "" || address === "") {
+            console.log("Ignoring application because there is either no application number or no address.");
+            continue;
         }
+
+        let receivedDate = moment.invalid();
+        if (receivedDateElement !== undefined)
+            receivedDate = moment(receivedDateElement.text.trim(), "D/MM/YYYY", true);  // allows the leading zero of the day to be omitted
+
+        let reason = "NO DESCRIPTION PROVIDED";
+        if (reasonElement !== null && reasonElement.text.trim() !== "")
+            reason = reasonElement.text.trim();
+
+        let developmentApplication = {
+            applicationNumber: applicationNumberElement.text.trim().replace(/\s/g, ""),
+            address: address,
+            reason: reason,
+            informationUrl: url,
+            commentUrl: CommentUrl,
+            scrapeDate: moment().format("YYYY-MM-DD"),
+            receivedDate: receivedDate.isValid() ? receivedDate.format("YYYY-MM-DD") : ""
+        }
+
+        developmentApplications.push(developmentApplication);
     }
 
     return developmentApplications;
@@ -193,12 +220,6 @@ function getRandom(minimum: number, maximum: number) {
     return Math.floor(Math.random() * (Math.floor(maximum) - Math.ceil(minimum))) + Math.ceil(minimum);
 }
 
-// Pauses for the specified number of milliseconds.
-
-function sleep(milliseconds) {
-    return new Promise(resolve => setTimeout(resolve, milliseconds));
-}
-
 // Parses the development applications.
 
 async function main() {
@@ -206,16 +227,21 @@ async function main() {
 
     let database = await initializeDatabase();
     
+    // Read the files containing all possible suburb names.
+
+    SuburbNames = {};
+    for (let suburb of fs.readFileSync("suburbnames.txt").toString().replace(/\r/g, "").trim().split("\n"))
+        SuburbNames[suburb.split(",")[0]] = suburb.split(",")[1];
+
     // Retrieve the page that contains the links to the PDFs.
 
     console.log(`Retrieving page: ${DevelopmentApplicationsUrl}`);
 
-    let body = await request({ url: DevelopmentApplicationsUrl, proxy: process.env.MORPH_PROXY });
+    let body = await request({ url: DevelopmentApplicationsUrl });
     let $ = cheerio.load(body);
-    await sleep(2000 + getRandom(0, 5) * 1000);
 
     let pdfUrls: string[] = [];
-    for (let element of $("td.uContentListDesc a[href$='.pdf']").get()) {
+    for (let element of $("td.u6ListTD a[href$='.pdf']").get()) {
         let pdfUrl = new urlparser.URL(element.attribs.href, DevelopmentApplicationsUrl).href;
         if (!pdfUrls.some(url => url === pdfUrl))  // avoid duplicates
             pdfUrls.push(pdfUrl);
