@@ -20,6 +20,7 @@ const DevelopmentApplicationsUrl = "https://www.alexandrina.sa.gov.au/page.aspx?
 const CommentUrl = "mailto:alex@alexandrina.sa.gov.au";
 
 declare const global: any;
+declare const process: any;
 
 // All valid suburb names.
 
