@@ -122,11 +122,12 @@ function findClosestElement(elements: Element[], text: string, direction: Direct
     if (matchingElement === undefined)
         return undefined;
 
-    let closestElement: Element = undefined;
+    let closestElement: Element = { text: undefined, x: Number.MAX_VALUE, y: Number.MAX_VALUE, width: 0, height: 0 };
     for (let element of elements)
-        if (closestElement === undefined || (isOverlap(matchingElement, element, direction) && calculateDistance(matchingElement, element, direction) < calculateDistance(matchingElement, closestElement, direction)))
+        if (isOverlap(matchingElement, element, direction) && calculateDistance(matchingElement, element, direction) < calculateDistance(matchingElement, closestElement, direction))
             closestElement = element;
-    return closestElement;
+            
+    return (closestElement.text === undefined) ? undefined : closestElement;
 }
 
 // Reads and parses development application details from the specified PDF.
@@ -167,19 +168,27 @@ async function parsePdf(url: string) {
 
         let address = "";
         if (houseNumberElement !== undefined)
-            address += houseNumberElement.text.trim();
+            address += houseNumberElement.text.replace(/Ã¼/g, " ").replace(/ü/g, " ").replace(/\s\s+/g, " ").trim();
         if (streetElement !== undefined)
-            address += ((address === "") ? "" : " ") + streetElement.text.trim();
-        if (suburbElement === undefined || suburbElement.text.trim() === "") {
+            address += ((address === "") ? "" : " ") + streetElement.text.replace(/Ã¼/g, " ").replace(/ü/g, " ").replace(/\s\s+/g, " ").trim();
+        if (suburbElement === undefined || suburbElement.text.trim() === "" || suburbElement.text.trim() === "0") {
             console.log("Ignoring application because there is no suburb.");
             continue;
         }
 
         // Attempt to add the state and post code to the suburb.
 
-        let suburbName = SuburbNames[suburbElement.text.trim()];
-        if (suburbName === undefined)
-            suburbName = suburbElement.text.trim();
+        let suburbText = suburbElement.text.replace(/Ã¼/g, " ").replace(/ü/g, " ").replace(/\s\s+/g, " ").trim();
+        let suburbName = SuburbNames[suburbText];
+        if (suburbName === undefined) {
+            for (let knownSuburbName in SuburbNames)
+                if (knownSuburbName + " " + knownSuburbName === suburbText) {
+                    suburbName = SuburbNames[knownSuburbName];  // adds the state and postcode
+                    break;
+                }
+            if (suburbName === undefined)
+                suburbName = suburbText;  // fall back to whatever the original text was
+        }
 
         address += ((address === "") ? "" : ", ") + suburbName;
         address = address.trim();
