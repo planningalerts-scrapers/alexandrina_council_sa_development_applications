@@ -49,7 +49,7 @@ async function insertRow(database, developmentApplication) {
         sqlStatement.run([
             developmentApplication.applicationNumber,
             developmentApplication.address,
-            developmentApplication.reason,
+            developmentApplication.description,
             developmentApplication.informationUrl,
             developmentApplication.commentUrl,
             developmentApplication.scrapeDate,
@@ -60,9 +60,9 @@ async function insertRow(database, developmentApplication) {
                 reject(error);
             } else {
                 if (this.changes > 0)
-                    console.log(`    Inserted: application \"${developmentApplication.applicationNumber}\" with address \"${developmentApplication.address}\" and reason \"${developmentApplication.reason}\" into the database.`);
+                    console.log(`    Inserted: application \"${developmentApplication.applicationNumber}\" with address \"${developmentApplication.address}\" and description \"${developmentApplication.description}\" into the database.`);
                 else
-                    console.log(`    Skipped: application \"${developmentApplication.applicationNumber}\" with address \"${developmentApplication.address}\" and reason \"${developmentApplication.reason}\" because it was already present in the database.`);
+                    console.log(`    Skipped: application \"${developmentApplication.applicationNumber}\" with address \"${developmentApplication.address}\" and description \"${developmentApplication.description}\" because it was already present in the database.`);
                 sqlStatement.finalize();  // releases any locks
                 resolve(row);
             }
@@ -158,11 +158,11 @@ async function parsePdf(url: string) {
             return { text: item.str, x: transform[4], y: transform[5], width: item.width, height: item.height };
         })
 
-        // Find the application number, reason, received date and address in the elements (based
-        // on proximity to known text such as "Dev App No").
+        // Find the application number, description, received date and address in the elements
+        // (based on proximity to known text such as "Dev App No").
 
         let applicationNumberElement = findClosestElement(elements, "Application No", Direction.Right);
-        let reasonElement = findClosestElement(elements, "Development Description", Direction.Down);
+        let descriptionElement = findClosestElement(elements, "Development Description", Direction.Down);
         let receivedDateElement = findClosestElement(elements, "Application received", Direction.Right);
         let houseNumberElement = findClosestElement(elements, "Property House No", Direction.Right);
         let streetElement = findClosestElement(elements, "Property Street", Direction.Right);
@@ -207,14 +207,14 @@ async function parsePdf(url: string) {
         if (receivedDateElement !== undefined)
             receivedDate = moment(receivedDateElement.text.trim(), "D/MM/YYYY", true);  // allows the leading zero of the day to be omitted
 
-        let reason = "NO DESCRIPTION PROVIDED";
-        if (reasonElement !== null && reasonElement.text.trim() !== "")
-            reason = reasonElement.text.trim();
+        let description = "NO DESCRIPTION PROVIDED";
+        if (descriptionElement !== null && descriptionElement.text.trim() !== "")
+            description = descriptionElement.text.trim();
 
         let developmentApplication = {
             applicationNumber: applicationNumberElement.text.trim().replace(/\s/g, ""),
             address: address,
-            reason: reason,
+            description: description,
             informationUrl: url,
             commentUrl: CommentUrl,
             scrapeDate: moment().format("YYYY-MM-DD"),
