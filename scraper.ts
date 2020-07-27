@@ -60,6 +60,7 @@ async function insertRow(database, developmentApplication) {
                 reject(error);
             } else {
                 console.log(`    Saved application \"${developmentApplication.applicationNumber}\" with address \"${developmentApplication.address}\" and description \"${developmentApplication.description}\" to the database.`);                sqlStatement.finalize();  // releases any locks
+                sqlStatement.finalize();  // releases any locks
                 resolve(row);
             }
         });
