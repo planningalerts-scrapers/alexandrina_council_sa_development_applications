@@ -16,7 +16,7 @@ import * as fs from "fs";
 
 sqlite3.verbose();
 
-const DevelopmentApplicationsUrl = "http://www.alexandrina.sa.gov.au/page.aspx?u=2351";
+const DevelopmentApplicationsUrl = "https://www.alexandrina.sa.gov.au/loose-pages/development-application-register";
 const CommentUrl = "mailto:alex@alexandrina.sa.gov.au";
 
 declare const global: any;
@@ -59,7 +59,7 @@ async function insertRow(database, developmentApplication) {
                 console.error(error);
                 reject(error);
             } else {
-                console.log(`    Saved: application \"${developmentApplication.applicationNumber}\" with address \"${developmentApplication.address}\" and description \"${developmentApplication.description}\" into the database.`);
+                console.log(`    Saved application \"${developmentApplication.applicationNumber}\" with address \"${developmentApplication.address}\" and description \"${developmentApplication.description}\" to the database.`);
                 sqlStatement.finalize();  // releases any locks
                 resolve(row);
             }
@@ -258,10 +258,11 @@ async function main() {
     await sleep(2000 + getRandom(0, 5) * 1000);
 
     let pdfUrls: string[] = [];
-    for (let element of $("td.u6ListTD a[href$='.pdf']").get()) {
+    for (let element of $("h3.generic-list__title a[href$='.pdf']").get()) {
         let pdfUrl = new urlparser.URL(element.attribs.href, DevelopmentApplicationsUrl).href;
-        if (!pdfUrls.some(url => url === pdfUrl))  // avoid duplicates
-            pdfUrls.push(pdfUrl);
+        if (pdfUrl.toLowerCase().includes(".pdf"))
+            if (!pdfUrls.some(url => url === pdfUrl))  // avoid duplicates
+                pdfUrls.push(pdfUrl);
     }
 
     if (pdfUrls.length === 0) {
@@ -276,7 +277,7 @@ async function main() {
     let selectedPdfUrls: string[] = [];
     selectedPdfUrls.push(pdfUrls.shift());
     if (pdfUrls.length > 0)
-        selectedPdfUrls.push(pdfUrls[getRandom(1, pdfUrls.length)]);
+        selectedPdfUrls.push(pdfUrls[getRandom(0, pdfUrls.length)]);
     if (getRandom(0, 2) === 0)
         selectedPdfUrls.reverse();
 
