@@ -59,7 +59,7 @@ async function insertRow(database, developmentApplication) {
                 console.error(error);
                 reject(error);
             } else {
-                console.log(`    Saved application \"${developmentApplication.applicationNumber}\" with address \"${developmentApplication.address}\" and description \"${developmentApplication.description}\" to the database.`);                sqlStatement.finalize();  // releases any locks
+                console.log(`    Saved application \"${developmentApplication.applicationNumber}\" with address \"${developmentApplication.address}\" and description \"${developmentApplication.description}\" to the database.`);
                 sqlStatement.finalize();  // releases any locks
                 resolve(row);
             }
@@ -258,7 +258,7 @@ async function main() {
     await sleep(2000 + getRandom(0, 5) * 1000);
 
     let pdfUrls: string[] = [];
-    for (let element of $("h3.generic-list__title a").get()) {
+    for (let element of $("h3.generic-list__title a[href$='.pdf']").get()) {
         let pdfUrl = new urlparser.URL(element.attribs.href, DevelopmentApplicationsUrl).href;
         if (pdfUrl.toLowerCase().includes(".pdf"))
             if (!pdfUrls.some(url => url === pdfUrl))  // avoid duplicates
